@@ -1,0 +1,265 @@
+--------------------------------------------------------------------------------------week-7 LAMBDA----------------------------------------------------------------------------------------
+aws lambda,dynamodb,amazons3,week-7
+
+steps:-
+a)create a s3 bucket choose a bucket name and rest leave as default
+b)creating dynamo db:- search for dynamodb and create new table
+choose a name for the table and set partition key as "id" and create a table
+c)next create lambda function choose option author from scratch and then set a function name select runtime as python 3.14
+there's an option custom execution role select LABROLE AND click save.
+d)now we select the created lambda function next select the add trigger option
+in trigger configuration select the s3 trigger and select the bucket created at the start
+next in the code section add the python code provided
+"""import boto3
+from uuid import uuid4
+def lambda_handler(event, context):
+    s3 = boto3.client("s3")
+    dynamodb = boto3.resource('dynamodb')
+   # Check if the 'Records' key is present in the event
+    if 'Records' in event:
+        # Iterate over each record in the event
+        for record in event['Records']:
+            bucket_name = record['s3']['bucket']['name']
+            object_key = record['s3']['object']['key']
+            size = record['s3']['object'].get('size', -1)
+            event_name = record.get('eventName', 'Unknown')  # Use get() method to handle missing keys
+            event_time = record.get('eventTime', 'Unknown')  # Use get() method to handle missing keys      
+            dynamoTable = dynamodb.Table('newtable')
+            dynamoTable.put_item(
+                Item={'unique': str(uuid4()), 'Bucket': bucket_name, 'Object': object_key,'Size': size, 'Event': event_name, 'EventTime': event_time})
+    else:
+        # Log a message indicating that the 'Records' key is missing from the event
+        print("No 'Records' key found in the event.")
+"""
+deploy the added code 
+
+then create a test event adding a new test name and create
+e)go to s3 bucket and upload a file
+f)open dynamodb again and go to explore items select the created table and then run it and if possible go to cloud watch and see the metrices
+--------------------------------------------------------------------WEEK-8(SNS,SQS)--------------------------------------------------------------------------------------------------------
+Exp-8 — SNS & SQS
+Part 1: SNS Email Notification
+
+1.Create SNS with any name, Type: Standard.
+2.Create subscription: Protocol: Email, Endpoint: your email.
+3.Confirm subscription from email.
+4.Publish message: Put something in subject and body, then send.
+Part 2: S3 to SNS Integration
+
+1.Create S3 bucket normally.
+2.Edit access policy of SNS and put this:
+{
+  "Version": "2012-10-17",
+  "Id": "example-ID",
+  "Statement": [
+    {
+      "Sid": "Example SNS topic policy",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "s3.amazonaws.com"
+      },
+      "Action": [
+        "SNS:Publish"
+      ],
+      "Resource": "SNS topic ARN",
+      "Condition": {
+        "ArnLike": {
+          "aws:SourceArn": "s3 bucket ARN"
+        },
+        "StringEquals": {
+          "aws:SourceAccount": "account id"
+        }
+      }
+    }
+  ]
+}
+3.Open S3 → Properties → Event Notification → Create Event Notification.
+4.Event name: any name, Event type: All objects create events, Destination: SNS topic.
+5.Test by uploading something, check email.
+
+Part 3: SQS Basic Operations
+
+1.Create SQS, Type: Standard, any name.
+2.Click Send and Receive Messages, message body: some message, click Send.
+3.Poll messages to see the message, you can delete also.
+
+Part 4: S3 → SNS → SQS → Lambda Pipeline
+
+1.Create S3, SNS, SQS normally.
+2.Create subscription in SNS: Protocol: SQS, Endpoint: SQS ARN.
+3.Add access policy in SQS by editing and putting:
+{
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "sns.amazonaws.com"
+      },
+      "Action": "sqs:SendMessage",
+      "Resource": "SQS ARN",
+      "Condition": {
+        "ArnEquals": {
+          "aws:SourceArn": "SNS ARN"
+        }
+      }
+    }
+  ]
+}
+4.Add access policy in SNS also:
+{
+  "Version": "2012-10-17",
+  "Id": "example-ID",
+  "Statement": [
+    {
+      "Sid": "Example SNS topic policy",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "s3.amazonaws.com"
+      },
+      "Action": [
+        "SNS:Publish"
+      ],
+      "Resource": "SNS topic ARN",
+      "Condition": {
+        "ArnLike": {
+          "aws:SourceArn": "S3 bucket ARN"
+        },
+        "StringEquals": {
+          "aws:SourceAccount": "Account ID"
+        }
+      }
+    }
+  ]
+}
+5.Open S3 → Properties → Event Notification → Event name: S3UploadEvent, Event type: All object create events, Destination: SNS topic.
+6.Test by uploading something in S3, poll messages from SQS.
+7.Configure Lambda: Create Lambda function normally, add trigger: SQS, select your SQS.
+8.Lambda code:
+def lambda_handler(event, context):
+    for record in event['Records']:
+        print("Message received from SQS:")
+        print(record['body'])
+    
+    return {
+        'statusCode': 200,
+        'body': 'Message processed successfully'
+    }
+9.Deploy, upload something in S3, and this will trigger everything. Watch logs in Lambda.
+-------------------------------------------------------------------week-9-------------------------------------------------------------------------------------------------------------------
+step 1:Go to AWS EC2 Console → Launch Instance->Name: webserver-1->Choose an AMI (Amazon Linux 2)->Select Instance Type (e.g., t2.micro)->
+Configure Security Group:->Allow SSH (22) from your IP->Allow HTTP (80) from anywhere (0.0.0.0/0) (not https)->Launch → Select/Create Key Pair → Launch.
+
+Run these commands after connecting VM
+first connect using shh key in cmd prompt where you .pem file is there
+next-> steps
+sudo yum update -y
+sudo yum install httpd -y
+sudo systemctl start httpd
+sudo systemctl enable httpd
+sudo sh -c 'echo  "This is Server 1" > /var/www/html/index.html'
+open google and paste the public ipv4
+
+do the same for second instance
+Repeat it for second instance
+sudo yum update -y
+sudo yum install httpd -y
+sudo systemctl start httpd
+sudo systemctl enable httpd
+sudo sh -c 'echo  "This is Server 2" > /var/www/html/index.html'
+open google and paste the public ipv4
+
+if instance doesn't connect put this in terminal:(optional)
+icacls "C:\Users\vivek vardhan\Downloads\ws1.pem" /inheritance:r 
+icacls "C:\Users\vivek vardhan\Downloads\ws1.pem" /grant:r "%USERNAME%:R"
+
+step 2:Go to EC2 → Security Groups → Create Security Group->Name: lb-sg->Allow HTTP (80) 0.0.0.0/0 from anywhere->Optional: HTTPS (443) 0.0.0.0/0 if using SSL(inbound rules)
+step 3: Go to EC2 → target group->new target group(web-server-tg)->type:instance->protocol:http->port 80->health check(default)
+step 3:register targets->select ws1,ws2->click pending below->register->click next->next
+step 4: create loadbalancer->shceme(internet-facing)->type ipv4->subnets(select all)->select security group(created before lb-sg)->target group(select that we created before)->create
+step 5:Verify Load Balancer->Go to Load Balancers → Select ALB → Description → DNS name->Copy the DNS name (something like my-alb-123456.us-east-1.elb.amazonaws.com)->Paste it in a browser → You should see either WebServer-1 or WebServer-2 page.->Refresh multiple times → Load balancer distributes traffic between the two instances
+step 6:Go to Target Groups → web-servers-tg → Targets->Ensure Status of both instances is healthy
+
+AUTOSCALING WITH LOAD BALANCER
+
+Step 1: Create an AMI from Existing EC2 Instance->Go to EC2 Console → Instances->Select the EC2 instance you already configured (WS1)->Click Actions → Image and Templates → Create Image->Provide Image Name: e.g., my-webserver-AMI->Click Create Image
+Step 2: Create an AMI from Existing EC2 Instance->Go to EC2 Console → Instances->Select the EC2 instance you already configured (WS2)->Click Actions → Image and Templates → Create Image->Provide Image Name: e.g., my-webserver-AMI->Click Create Image
+
+step 3: Create a Launch Template->Go to EC2 →Launch Templates → Create Launch Template->Launch Template Name: my-launch-template-1->AMI: Select the AMI created in Step 1 (my-webserver-AMI)->Instance Type: t2.micro (or your choice)->Key Pair: Select your existing key pair(ws1)->Security Groups: Select the Load Balancer Security Group (allow HTTP 80)->Click Create Launch Template
+step 4: Create a Launch Template->Go to EC2 →Launch Templates → Create Launch Template->Launch Template Name: my-launch-template-2->AMI: Select the AMI created in Step 2 (my-webserver-AMI-2)->Instance Type: t2.micro (or your choice)->Key Pair: Select your existing key pair(ws2)->Security Groups: Select the Load Balancer Security Group (allow HTTP 80)->Click Create Launch Template
+
+step 5:Create Auto Scaling Group (ASG)->Go to EC2 → Auto Scaling Groups → Create Auto Scaling Group->Name: webserver-asg1->Launch Template: Select my-launch-template1->Template Version: Select Version 1->Click Next->Network Settings->VPC: Default VPC (or your existing VPC)->Availability Zones (AZs): Select all subnets (for high availability)->Load Balancer: Enable Attach to an existing load balancer->Select your existing Load Balancer->Health Check: HTTP->Set Health Check Grace Period: 300 seconds->Click next->Configure Group Size->Desired Capacity: 2 (initial instances)->Minimum Capacity: 1->Maximum Capacity: 4->Click Next->Click Create Auto Scaling Group
+
+step 6:Create Auto Scaling Group (ASG)->Go to EC2 → Auto Scaling Groups → Create Auto Scaling Group->Name: webserver-asg2->Launch Template: Select my-launch-template2->Template Version: Select Version 1->Click Next->Network Settings->VPC: Default VPC (or your existing VPC)->Availability Zones (AZs): Select all subnets (for high availability)->Load Balancer: Enable Attach to an existing load balancer->Select your existing Load Balancer->Health Check: HTTP->Set Health Check Grace Period: 300 seconds->Click next->Configure Group Size->Desired Capacity: 2 (initial instances)->Minimum Capacity: 1->Maximum Capacity: 4->Click Next->Click Create Auto Scaling Group
+
+step:7 Step 5: Test the Load Balancer->Copy the Load Balancer DNS Name from ALB->Open in a browser → You should see your web page from one of the instances->Refresh multiple times → traffic alternates between instances
+                                      ✅ This confirms Auto Scaling + Load Balancer is working correctly.
+-----------------------------------------------------------------------------week10-Elastic Beanstalk---------------------------------------------------------------------------------------
+1.Create Elastic Beanstalk, some name.
+2.Create environment → Web server environment.
+3.Platform: Tomcat.
+4.Under Application Code:->Select Upload your code->Upload your .war file->Upload WAR code from: https://tomcat.apache.org/tomcat-6.0-doc/appdev/sample/
+5.version label:v1
+6.Service Role → Select existing:LabRole->EC2 Instance Profile(e.g., LabInstanceProfile)->EC2 Key Pair →Optional(for SSH)
+7.Select VPC (default is fine)->Select Subnets->Enable Public IP
+8.Instance: t2.micro,ENVIROLMENT Type: Load Balancer, Min: 1, Max: 2.->create
+9.Open the URL (domain link).
+10.Upload and Deploy → Upload same with different version label, and open URL again.
+-----------------------------------------------------------------------------week11(AWS LEX BOT CREATION)-----------------------------------------------------------------------------------
+
+step 1: login to personal aws and go to amazon lex and click create bot
+step 2: create a blank bot->name->iam- create new iam role->lang(ENG)->done
+step 3:Go to Intents->Name: BookHotel->intent:bookhotel->Add user sentences (how user talks):I want to book a hotel,Book a room,Reserve hotel,I need a room.
+step 4: Add Slot->Click Add slot->Fill:->Slot name: age->Slot type: AMAZON.Number->Prompt: What is your age?->Mark as Required->Slots -> under Advance options->Scroll to Slot capture: success response ->Conditional branching->Click Add condition
+Example:
+Condition:
+ If {age} < 18
+Response:
+Your not eligible for hoot booking?
+step 5:Add Slot->Click Add slot->Slot name: location->Slot type: AMAZON.City->Prompt: Which city do you want?->Mark as Required
+step 6:another slot as checkin slot type amazon.date and prompt as what is check-in date?  (for retry prompt follow below steps)
+select the checkin slot go to advanced options and under slot prompt click the variations thing and enter text as "please enter a valid date(eg 2026-03-05)"
+step 7:another slot as nights slot type as amazon.number and prompt as how many nights will you stay?
+step 8:Click on Back to intents->If you want custom values:->Go to Slot Types->Click Add slot type ->add blank slot type->Name: RoomType
+step 9:Add values:Single,Double,Suite->Save->go back to intent->add slot(in bookroom intent)->Slot name: RoomType ,Slot type: RoomType->prompt(which type of room u need?)
+step 10:RoomType(slot)-adv options->Go to slot prompts -> more prompt options->Click Add -> add card groups->Card Title: Select Room Type->click on add Buttons:Single → "Single",Double → "Double",Suite → "Suite"->save.
+step 11 go to conformation section inside the intent add conformation prompt->Initial Response:Welcome to Hotel Booking! What is your name?->Confirmation prompt:Do you want to confirm booking in {location} for {nights} nights?->in decline response "okay booking cancelled.
+step 12: build and test->click build->Use Test chatbot panel->Try:Book a hotel
+Sample output
+User: Book a hotel
+Bot: What is your age?
+User: 25
+Bot: Which city do you want?
+User: Hyderabad
+Bot: Check-in date?
+User: Tomorrow
+Bot: Number of nights?
+User: 2
+Bot: Select room type
+User: Double
+Bot: Do you want to confirm booking in Hyderabad for 2 nights?
+User: Yes
+Bot: Booking confirmed.
+------------------------------------------------------------------week-12(IAM)-------------------------------------------------------------------------------------------------------------
+step1: go to iam in aws-> go to users->create users
+step2: : User Details: Enter a name (e.g., S3_Specialist). Check the box for "Provide user access to the AWS Management->Console."–custom password.->next
+step3:Set Permissions: Select "Attach policies directly." Search for and select AmazonS3FullAccess.->Complete the wizard. On the final page, click Download .csv file on create user
+step4:or go to the AWS sign-in page and select IAM User->Enter the Account ID, then the IAM Username and Password from the .csv.
+step 5:Navigate to S3. Create a new bucket. It will work perfectly because of the attached policy.
+step 6: now log out as iam user and login ad root user ->got to that user in iam and go to security credentials and in access key click create access key->use case:cli(cmmnd line interface)->click create u'll get the access key click download .csv file for credentials
+step 7:Install the AWS CLI Tool from google on your computer->Download https://awscli.amazonaws.com/AWSCLIV2.msi
+step 8:Open your Command Prompt (CMD) or Terminal. Step 7: Type aws configure and press Enter.->Access Key ID(from .csv)->Secret Access Key(from .csv)->Default region: (e.g., ap-south-1)->Default output: json
+
+step9: Run:->aws s3 ls
+step 10: run->aws ec2 describe-instances.
+Result: You will get an (AccessDenied) error.
+
+step 10: Run aws s3 mb s3://your-unique-bucket-name ex:aws s3 mb s3://week12-bucket ---->this should be a unique name than previous one
+
+step 11: now go and see in s3 and see the created bucket
+----------------------------------------------------------------------week-13---------------------------------------------------------------------------------------------------------------
+
+step 1:Log in to the AWS Management Console as the Root User.->Search for IAM under the "Security, Identity, & Compliance" category.
+step 2:Go to IAM > Roles > Create role->aws service->use case:ec2->Add Permissions: Search for and check AmazonS3FullAccess.->Name it (e.g., EC2-S3-ReadOnly-Role) and click Create role.
+step3: go to ec2 and create instace with some name and continue without keypair->next click on actions and select security->modify iam role->in iam role select the iam role you created before
+step 4:now connect the instance in aws itself by clicking connect and then->then run:aws s3 ls->run:aws ec2 describe-instances
+-------------------------------------------------------------------------okbye--------------------------------------------------------------------------------------------------------------
