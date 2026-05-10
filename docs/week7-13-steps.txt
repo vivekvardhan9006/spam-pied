@@ -1,3 +1,135 @@
+----------------------------------------------week1-ec2(pem,ppk,rds)----------------------------------------------------------------------------------------------------
+Exp-1 — EC2 Access
+a) Connect using PuTTY (.ppk)
+1.Create an EC2 with a key pair of .ppk, copy the IP of it.
+2.Open PuTTY, paste the IP.
+3.Left side: Connection → SSH → Auth → Credentials, browse the .ppk and click Open.
+4.If Linux login as: ec2-user, if Ubuntu login as: ubuntu.   Test: whoami (console)
+	
+b) Convert .pem to .ppk(ubuntu)
+1.Convert .pem file to .ppk using PuTTYGen
+2.Open PuTTYgen->Click Load->Select your .pem file->(change file type to All Files)->Click Open->Click Save private key->Save as keyname.ppk
+3.open putty->paste ur dns name (ubuntu@ip(enter-ip))->in auth(credentials) give the ppk file created->click open->cmd(enter whoami)
+
+c) RDP (Windows EC2)
+1.Create an EC2 —>os:windows->ami windows(2019-2022)->use .pem(keypair)-> in security groups add RDP in the custom TCP.
+2.Click on Connect → using RDP client → click Get Password → upload the .pem file to decrypt password.->copy password
+3.Click the Windows symbol and search RDP, paste the IP of the EC2.
+4.Login as Administrator, password: decrypted password.
+5.You can see the new system.
+---------------------------------------------------week2-Volumes & Snapshots-----------------------------------------------------------------------------------------------
+Exp-2 — Volumes & Snapshots
+Volumes
+a) Attach a Volume
+1.Create an EC2, select an AZ.
+2.Create a volume with the same AZ, size anything.
+3.Attach volume to the running EC2, device name: /dev/sdf.
+4.Open EC2 console and run lsblk.
+b) Format and Mount the Volume
+1.After attaching and connecting to EC2-ssh:
+"""
+sudo su
+lsblk -fs
+fdisk /dev/nvme1n1    (m, n, p, , , , w)
+lsblk
+mkfs.xfs /dev/nvme1n1p1
+mkdir /mnt/vish
+mount /dev/nvme1n1p1 /mnt/vish
+df -h
+blkid /dev/nvme1n1p1
+(COPY UUID)
+nano /etc/fstab
+(inside that, last line add) =UUID=<UUID-value>   /mnt/vish   xfs   defaults,nofail   0   0
+mount -a
+reboot and check for files
+"""
+c) Move Volume to Another EC2
+1.Create another EC2 with the same AZ.
+2.Detach the volume from the old EC2 and attach to the new one.
+3.Connect to the new EC2 and run:
+"""
+sudo su
+mkdir /mnt/vish
+mount /dev/nvme1n1p1 /mnt/vish
+lsblk -fs
+"""	
+Snapshots
+1.For a given volume you created, click on Actions → Create Snapshot.
+2.From the Snapshots section, click on Copy Snapshot and select some region.
+3.Switch to that region and create a volume for it from Actions.
+4.Attach an EC2 in that region to the created volume with the same AZ. (run lsblk if needed)
+---------------------------------------------------week3-efs-------------------------------------------------------------------------------------------------------------------
+1.Create 2 EC2s->ami(Linux)-> keypair(efs same for both)->with 2 different availability zones(subnet-1a)-efs1 and (subnet-1b)-efs2 and include NFS in the custom TCP->(0.0.0.0/0) and also ssh tcp port 20(default).
+2.Create an EFS ->customie->with only 2 availability zones(keep only 1a,1b).
+3.security group (NFS) and attach it to the EFS(which is created while doing ec2)
+4.Open consoles of both EC2s(for efs1 and efs2 instance. and connect using ssh key
+Run the following commands on both:
+sudo su
+mkdir efs
+yum install -y amazon-efs-utils
+5.got to efs->attach->mount via dns-> u will get 2 commands paste them in cmd promot
+(connect the efs with dns) efs → connect → dns → paste in console
+6.cd efs
+7.in any 1 do: nano h.txt and put text
+(it shows in the other EC2)
+-------------------------------------------------week4--s3-------------------------------------------------------------------------------------------------------------------------
+a) Public Access to S3 Object
+1.Create an S3 bucket, allow ACLs under ownership.
+2.Block all public access — uncheck that (very important).
+3.Enable versioning (better, because others need it).
+4.After creation: Bucket → Permissions → ACL → Public Access → right side tick.
+5.Upload any image, click on image → Permissions tab  → ACL(tick all) → Public Access → left and right tick.
+6.Properties → Copy link → open in incognito.
+
+b) Versioning
+1.Enable versioning (compulsory).
+2.Upload a text file, change it locally, and upload again.
+3.Buckets → Objects → click Show Versions → you can see both versions.
+4.Delete the latest version and the old version still shows up.
+
+c) Cross Region Replication
+1.Create 1 more bucket(dest-bucket) in a different region with the same process including versioning enabled.
+2.Go to first bucket → Management → create Replication Rules.
+3.Status = Enable, Source bucket = Apply to all objects, Destination bucket = select the created one, IAM Role = Lab Role. Replicate existing objects → No (this option comes after creating).
+4.Upload any file in bucket 1 — it will automatically show in the 2nd bucket.
+
+d) Static Website Hosting
+1.create a s3 bucket with below configuration
+2.Upload index.html and error.html into S3 following the normal process including ACL settings and allowing static hosting. Put index and error filenames in the fields.
+3.Click on index.html → Permissions → Everyone → both tick. Same with error.html.
+4.Bucket → Properties → scroll to Static Website Hosting → copy URL → check.
+---------------------------------------------------week5-vpc-------------------------------------------------------------------------------------------------------------------------
+EXP-5 — VPC
+1.Create a VPC->vpc only, ipv4 CIDR: 10.0.0.0/16.->create
+2.Create subnets:
+	Public: AZ-east-1a, subnet CIDR: 10.0.1.0/24
+	Private: AZ-east-1a, subnet CIDR: 10.0.2.0/24
+3.Create an Internet Gateway, attach the VPC (shown after creation).
+4.Create Route Tables->select vpc:
+	Public rt: Create → Actions → Edit Routes → Add Route → Destination: 0.0.0.0/0, Internet Gateway (custom made) → Actions → EditSubnet Associations → add the public subnet.
+	Private rt create: Create → Actions → Edit Subnet Associations → add the private subnet.
+5.Public subnet → Actions → Edit Subnet Settings → Auto-assign IP (tick).
+6.Create a security group, add the custom VPC under creation, inbound rules: SSH(myip), HTTP(0.0.0.0/0), HTTPS(0.0.0/0).
+7.Create an EC2 for the public subnet: Edit Network → VPC (custom), Subnet: public, select existing security group: custom made.
+8.Do the same for the EC2 of the private subnet.
+9.Connecting to both: public subnet EC2 will connect, private will not.
+----------------------------------------------week6-bashion server--------------------------------------------------------------------------------------------------------------------
+Exp-6 — Bastion Server
+1.Follow the same process as Exp-5 until creation of the route tables.
+2.Create an Elastic IP.
+3.Create a NAT Gateway: Method of Elastic IP → Manual, select the created IP.
+4.Attach the NAT Gateway to the private route table.
+5.Create 2 EC2 instances for public and private subnets and attach the 2 subnets.
+6.Open the public EC2 instance and connect it via SSH. In the terminal where .pem file is located, run:
+	ssh -i "key.pem" ec2-user@<public-ip>
+7.Open another terminal and copy the key to the public EC2:
+	scp -i yourkey.pem yourkey.pem ec2-user@<public-ip>:~
+8.In terminal 1 (connected to public EC2), run:
+	chmod 400 yourkey.pem
+9.Open the EC2 with private subnet and connect it via SSH command from terminal 1:
+	ssh -i yourkey.pem ec2-user@<private-ip>
+10.After connection success, run to check internet access:
+	ping google.com
 --------------------------------------------------------------------------------------week-7 LAMBDA----------------------------------------------------------------------------------------
 aws lambda,dynamodb,amazons3,week-7
 
