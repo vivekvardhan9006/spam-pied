@@ -47,3 +47,13 @@ li {
   line-height: 1.6;
   font-size: 14px;
 }
+.zip-download {
+  margin-bottom: 20px;
+}
+.top-buttons {
+  margin-bottom: 20px;
+}
+
+.top-buttons a {
+  text-decoration: none;
+}
